@@ -22,24 +22,30 @@ service cloud.firestore {
           && d.score is int && d.score >= 0 && d.score <= 10
           && d.comment is string && d.comment.size() <= 2000;
       }
+      function validWorkYear(d) {
+        let year = (request.time + duration.value(9, 'h')).year();
+        return (d.currentlyWorking == true && d.lastWorkedYear == null)
+          || (d.currentlyWorking == false && d.lastWorkedYear is int
+            && d.lastWorkedYear >= year - 9 && d.lastWorkedYear <= year);
+      }
       function rating(d) {
         return d.type == 'rating'
-          && d.keys().hasOnly(['storeId', 'type', 'score', 'createdAt'])
+          && d.keys().hasOnly(['storeId', 'type', 'currentlyWorking', 'lastWorkedYear', 'score', 'createdAt'])
           && d.score is int && d.score >= 0 && d.score <= 10;
       }
       function wage(d) {
         return d.type == 'wage'
-          && d.keys().hasOnly(['storeId', 'type', 'hourlyWage', 'createdAt'])
+          && d.keys().hasOnly(['storeId', 'type', 'currentlyWorking', 'lastWorkedYear', 'hourlyWage', 'createdAt'])
           && d.hourlyWage is int && d.hourlyWage >= 1 && d.hourlyWage <= 100000;
       }
       function period(d) {
         return d.type == 'period'
-          && d.keys().hasOnly(['storeId', 'type', 'workPeriod', 'createdAt'])
+          && d.keys().hasOnly(['storeId', 'type', 'currentlyWorking', 'lastWorkedYear', 'workPeriod', 'createdAt'])
           && d.workPeriod in ['3か月未満', '3か月〜半年', '半年〜1年', '1年以上'];
       }
       function comment(d) {
         return d.type == 'comment'
-          && d.keys().hasOnly(['storeId', 'type', 'comment', 'createdAt'])
+          && d.keys().hasOnly(['storeId', 'type', 'currentlyWorking', 'lastWorkedYear', 'comment', 'createdAt'])
           && d.comment is string && d.comment.matches('[\\s\\S]*[^\\s][\\s\\S]*') && d.comment.size() <= 2000;
       }
       allow read: if true;
@@ -47,7 +53,7 @@ service cloud.firestore {
         && validStoreId(request.resource.data.storeId)
         && request.resource.data.createdAt == request.time
         && (legacyReview(request.resource.data)
-          || ('type' in request.resource.data && (rating(request.resource.data)
+          || ('type' in request.resource.data && validWorkYear(request.resource.data) && (rating(request.resource.data)
             || wage(request.resource.data) || period(request.resource.data) || comment(request.resource.data))));
       allow update, delete: if false;
     }

@@ -22,7 +22,7 @@ export async function createStore(store) {
   return {...data, id:store.id};
 }
 export async function createReview(review) {
-  const data = { storeId:review.storeId, type:review.type, createdAt:serverTimestamp() };
+  const data = { storeId:review.storeId, type:review.type, currentlyWorking:review.currentlyWorking, lastWorkedYear:review.lastWorkedYear, createdAt:serverTimestamp() };
   if(review.type==='rating')data.score=review.score;
   else if(review.type==='wage')data.hourlyWage=review.hourlyWage;
   else if(review.type==='period')data.workPeriod=review.workPeriod;

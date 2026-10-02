@@ -38,8 +38,14 @@ const sampleWorkInfo = {
 const periods = ['3か月未満', '3か月〜半年', '半年〜1年', '1年以上'];
 const contributionLabels = {rating:'総合評価を投稿する', wage:'時給を投稿する', period:'働いた期間を投稿する', comment:'声を投稿する'};
 let contributionMode = null, contributionStoreId = null, contributionBusy = false;
+const currentWorkYear = Number(new Intl.DateTimeFormat('en', {year:'numeric', timeZone:'Asia/Tokyo'}).format(new Date()));
+function validWorkYear(r) {
+ return (r.currentlyWorking===true && r.lastWorkedYear===null)
+  || (r.currentlyWorking===false && Number.isInteger(r.lastWorkedYear) && r.lastWorkedYear>=currentWorkYear-9 && r.lastWorkedYear<=currentWorkYear);
+}
 function validContribution(r) {
  if(!r || typeof r.storeId!=='string')return false;
+ // 過去の投稿は時期不明のまま読み込み、新規投稿には時期を必須にする。
  if(!r.type)return Number.isInteger(r.score)&&r.score>=0&&r.score<=10&&typeof r.comment==='string';
  if(r.type==='rating')return Number.isInteger(r.score)&&r.score>=0&&r.score<=10;
  if(r.type==='wage')return Number.isInteger(r.hourlyWage)&&r.hourlyWage>=1&&r.hourlyWage<=100000;
@@ -56,7 +62,10 @@ function workStats(id) {
   workPeriod:most?periods.filter((_,i)=>counts[i]===most).join('・')+'が多い':null};
 }
 function buildContribution(type,storeId,form) {
- const result={id:crypto.randomUUID(),storeId,type};
+ const selected=form.get('lastWorkedYear');
+ if(selected===null||selected==='')throw new Error('最後に働いていた年を選択してください。');
+ const result={id:crypto.randomUUID(),storeId,type,currentlyWorking:selected==='current',lastWorkedYear:selected==='current'?null:Number(selected)};
+ if(!validWorkYear(result))throw new Error('働いていた年を確認してください。');
  if(type==='rating'){const value=form.get('score');if(value===null||value==='')throw new Error('評価を選択してください。');result.score=Number(value);}
  else if(type==='wage'){const value=form.get('hourlyWage');if(value===null||!String(value).trim())throw new Error('時給を入力してください。');result.hourlyWage=Number(value);}
  else if(type==='period')result.workPeriod=form.get('workPeriod');
@@ -110,6 +119,7 @@ function openForm(type) {
  if(type==='wage')fields.innerHTML='<label for="hourly-wage">時給（円）</label><input class="contribution-input" id="hourly-wage" name="hourlyWage" type="number" inputmode="numeric" min="1" max="100000" step="1" placeholder="例：1280" required>';
  if(type==='period')fields.innerHTML=`<fieldset><legend>働いた期間</legend><div class="period-options">${periods.map((p,i)=>`<label><input type="radio" name="workPeriod" value="${p}" required><span>${p}</span></label>`).join('')}</div></fieldset>`;
  if(type==='comment')fields.innerHTML='<label for="comment">コメント</label><textarea id="comment" name="comment" rows="4" maxlength="2000" placeholder="働いてみてどうでしたか？自由に書いてください" required></textarea><p class="privacy">個人を特定できる情報は書かないでください。</p>';
+ fields.innerHTML += `<div class="work-year-field"><label for="last-worked-year">最後に働いていた年</label><select class="contribution-input" id="last-worked-year" name="lastWorkedYear" required><option value="">選択してください</option><option value="current">現在も勤務中</option>${Array.from({length:10},(_,i)=>`<option value="${currentWorkYear-i}">${currentWorkYear-i}年</option>`).join('')}</select></div>`;
  form.querySelector('.submit').disabled=true;dialog.showModal();
 }
 const contributionForm=document.getElementById('review-form');

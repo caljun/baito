@@ -137,3 +137,6 @@ main.store-detail { max-width: 660px; }
 .card-rating .count { margin-left: 4px; }
 .card-voices { margin-top: 16px; }
 .card-sample-note { display: block; color: #777; font-size: 12px; margin-top: 14px; }
+
+.work-year-field { margin-top: 24px; }
+select.contribution-input { background: #fff; color: #222; font-size: 16px; min-height: 44px; }
