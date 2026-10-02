@@ -73,6 +73,29 @@ function buildContribution(type,storeId,form) {
  if(!validContribution(result))throw new Error('入力内容を確認してください。');
  return result;
 }
+function yearGroups(id,type) {
+ const relevant=reviews.filter(r=>r.storeId===id&&(type==='rating'?Number.isInteger(r.score):type==='comment'?typeof r.comment==='string'&&r.comment.trim():r.type===type));
+ const groups=[{label:'現在も勤務中',rows:relevant.filter(r=>r.currentlyWorking===true)},
+  ...Array.from({length:10},(_,i)=>({label:`${currentWorkYear-i}年`,rows:relevant.filter(r=>r.currentlyWorking===false&&r.lastWorkedYear===currentWorkYear-i)}))];
+ const unknown=relevant.filter(r=>r.currentlyWorking!==true&&!(r.currentlyWorking===false&&Number.isInteger(r.lastWorkedYear)));
+ if(unknown.length)groups.push({label:'時期不明',rows:unknown});
+ const olderYears=[...new Set(relevant.filter(r=>r.currentlyWorking===false&&Number.isInteger(r.lastWorkedYear)&&r.lastWorkedYear<currentWorkYear-9).map(r=>r.lastWorkedYear))].sort((a,b)=>b-a);
+ for(const year of olderYears)groups.push({label:`${year}年`,rows:relevant.filter(r=>r.currentlyWorking===false&&r.lastWorkedYear===year)});
+ return groups;
+}
+function yearCards(id,type) {
+ const cards=yearGroups(id,type).map(({label,rows})=>{
+  let content='<p class="year-empty">データなし</p>',style='';
+  if(rows.length){
+   if(type==='rating'){const value=rows.reduce((sum,r)=>sum+r.score,0)/rows.length;style=colors(value);content=`<p class="year-value year-score">${value.toFixed(1)}<small> / 10</small></p><small class="year-count">${rows.length}件</small>`;}
+   if(type==='wage'){const value=Math.round(rows.reduce((sum,r)=>sum+r.hourlyWage,0)/rows.length);content=`<p class="year-value">${value.toLocaleString('ja-JP')}<small>円</small></p><small class="year-count">${rows.length}件</small>`;}
+   if(type==='period'){const counts=periods.map(p=>rows.filter(r=>r.workPeriod===p).length),max=Math.max(...counts);content=`<p class="year-period">${escapeHtml(periods.filter((_,i)=>counts[i]===max).join('・'))}</p><small class="year-count">${rows.length}件</small>`;}
+   if(type==='comment')content=`<div class="year-comments">${rows.map(r=>`<p>${escapeHtml(r.comment)}</p>`).join('')}</div><small class="year-count">${rows.length}件</small>`;
+  }
+  return `<article class="year-card${rows.length?'':' is-empty'}" style="${style}"><h3>${label}</h3>${content}</article>`;
+ }).join('');
+ return `<div class="year-cards" tabindex="0" role="region" aria-label="${{rating:'総合評価',wage:'時給',period:'働いた期間',comment:'みんなの声'}[type]}の年別データ">${cards}</div>`;
+}
 function detail(s) {
  activeStore = s;
  app.classList.add('store-detail');
@@ -89,19 +112,23 @@ function detail(s) {
    <section class="detail-section overall-rating" aria-labelledby="overall-heading">
     <div class="section-heading"><h2 id="overall-heading">総合評価</h2><button class="section-post" data-contribution="rating" aria-label="総合評価を投稿する">評価する</button></div>
     <div class="overall-value"><span class="score big-score">${scoreText(t.score)}</span><span class="denom">/ 10</span><span class="rating-count">${t.reviews.length}人</span></div>
+    ${yearCards(s.id,'rating')}
    </section>
    <section class="detail-section" aria-labelledby="wage-heading">
     <div class="section-heading"><h2 id="wage-heading">時給</h2><button class="section-post" data-contribution="wage" aria-label="時給を投稿する">投稿する</button></div>
     ${wage != null ? `<p class="wage-value"><span>平均</span> ${wage.toLocaleString('ja-JP')}<span>円</span></p>${contributed.hourlyWage === null ? '<small class="sample-note">サンプル値</small>' : ''}` : '<p class="information-value">未登録</p>'}
+    ${yearCards(s.id,'wage')}
    </section>
    <section class="detail-section" aria-labelledby="period-heading">
     <div class="section-heading"><h2 id="period-heading">働いた期間</h2><button class="section-post" data-contribution="period" aria-label="働いた期間を投稿する">投稿する</button></div>
     <p class="information-value">${period ? escapeHtml(period) : '未登録'}</p>
     ${!contributed.workPeriod && work ? '<small class="sample-note">サンプル値</small>' : ''}
+    ${yearCards(s.id,'period')}
    </section>
    <section class="detail-section" aria-labelledby="voices-heading">
     <div class="section-heading"><h2 id="voices-heading">みんなの声</h2><button class="section-post" data-contribution="comment" aria-label="みんなの声を投稿する">投稿する</button></div>
     <p class="voices-summary">${escapeHtml(s.summary)}</p>
+    ${yearCards(s.id,'comment')}
    </section>
   </div>`;
  app.querySelectorAll('[data-contribution]').forEach(button=>button.onclick=()=>openForm(button.dataset.contribution));

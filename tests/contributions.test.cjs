@@ -52,3 +52,14 @@ test('Work year requires a choice, accepts current and ten years, rejects out-of
  for(const y of [year,year-9]){const r=run(`buildContribution('rating','1',{get:k=>({score:'8',lastWorkedYear:'${y}'})[k]??null})`);assert.equal(r.lastWorkedYear,y);assert.equal(r.currentlyWorking,false);}
  for(const y of [year+1,year-10])assert.throws(()=>run(`buildContribution('rating','1',{get:k=>({score:'8',lastWorkedYear:'${y}'})[k]??null})`));
 });
+test('Year cards separate current, dated and unknown data without inventing missing values',()=>{
+ const {run}=setup();const year=run('currentWorkYear');
+ run(`saved=[{storeId:'1',type:'rating',score:0,currentlyWorking:false,lastWorkedYear:${year}},{storeId:'1',type:'rating',score:10,currentlyWorking:false,lastWorkedYear:${year}},{storeId:'1',type:'wage',hourlyWage:1300,currentlyWorking:true,lastWorkedYear:null},{storeId:'1',type:'comment',comment:'<script>text</script>',currentlyWorking:false,lastWorkedYear:${year}}];reviews=[...saved,...seed]`);
+ assert.equal(run(`yearGroups('1','rating').find(g=>g.label==='${year}年').rows.length`),2);
+ assert.equal(run(`yearGroups('1','rating').find(g=>g.label==='${year-1}年').rows.length`),0);
+ assert.equal(run("yearGroups('1','rating').find(g=>g.label==='時期不明').rows.length"),10);
+ assert.ok(run("yearCards('1','rating')").includes('5.0'));assert.ok(run("yearCards('1','wage')").includes('1,300'));
+ assert.ok(run("yearCards('1','period')").includes('データなし'));assert.ok(!run("yearCards('1','period')").includes('サンプル'));
+ assert.ok(run("yearCards('1','comment')").includes('&lt;script&gt;'));assert.ok(!run("yearCards('1','comment')").includes('<script>'));
+ run('detail(stores[0])');assert.equal((run('app.innerHTML').match(/class="year-cards"/g)||[]).length,4);
+});
