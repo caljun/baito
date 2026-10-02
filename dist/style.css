@@ -112,3 +112,6 @@ textarea { display: block; width: 100%; margin-top: 12px; border: 1px solid #aaa
 #store-form .primary { width: 100%; margin-top: 20px; }
 #store-error { color: #a32626; }
 @media (max-width: 560px) { .header-inner { flex-wrap: wrap; padding: 12px 0; gap: 10px; } .header-inner nav { margin-left: auto; gap: 12px; } .add-store-button { padding: 8px 10px; font-size: 12px; } }
+
+.connection-status { width: min(100% - 48px, 1080px); margin: 16px auto; font-size: 14px; color: #666; }
+.connection-status[hidden] { display: none; }

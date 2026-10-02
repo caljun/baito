@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function validStoreId(id) {
+      return id in ['1', '2', '3'] || exists(/databases/$(database)/documents/stores/$(id));
+    }
+    match /stores/{storeId} {
+      allow read: if true;
+      allow create: if !(storeId in ['1', '2', '3'])
+        && request.resource.data.keys().hasOnly(['name', 'brand', 'summary', 'address', 'createdAt'])
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+        && request.resource.data.brand is string && request.resource.data.brand.size() > 0 && request.resource.data.brand.size() <= 100
+        && request.resource.data.address is string && request.resource.data.address.size() <= 200
+        && request.resource.data.summary == 'まだ口コミがありません。'
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['storeId', 'score', 'comment', 'createdAt'])
+        && request.resource.data.storeId is string && validStoreId(request.resource.data.storeId)
+        && request.resource.data.score is int && request.resource.data.score >= 0 && request.resource.data.score <= 10
+        && request.resource.data.comment is string && request.resource.data.comment.size() <= 2000
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+  }
+}
