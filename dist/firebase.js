@@ -12,8 +12,8 @@ const firebaseConfig = {
 };
 const db = getFirestore(initializeApp(firebaseConfig));
 export function subscribeData(onStores, onReviews, onError) {
-  const stopStores = onSnapshot(collection(db, 'stores'), snapshot => onStores(snapshot.docs.map(d => ({...d.data(), id:d.id}))), onError);
-  const stopReviews = onSnapshot(collection(db, 'reviews'), snapshot => onReviews(snapshot.docs.map(d => ({...d.data(), id:d.id}))), onError);
+  const stopStores = onSnapshot(collection(db, 'stores'), {includeMetadataChanges:true}, snapshot => onStores(snapshot.docs.filter(d=>!d.metadata.hasPendingWrites).map(d => ({...d.data(), id:d.id}))), onError);
+  const stopReviews = onSnapshot(collection(db, 'reviews'), {includeMetadataChanges:true}, snapshot => onReviews(snapshot.docs.filter(d=>!d.metadata.hasPendingWrites).map(d => ({...d.data(), id:d.id}))), onError);
   return () => { stopStores(); stopReviews(); };
 }
 export async function createStore(store) {
@@ -22,7 +22,12 @@ export async function createStore(store) {
   return {...data, id:store.id};
 }
 export async function createReview(review) {
-  const data = { storeId:review.storeId, score:review.score, comment:review.comment, createdAt:serverTimestamp() };
+  const data = { storeId:review.storeId, type:review.type, createdAt:serverTimestamp() };
+  if(review.type==='rating')data.score=review.score;
+  else if(review.type==='wage')data.hourlyWage=review.hourlyWage;
+  else if(review.type==='period')data.workPeriod=review.workPeriod;
+  else if(review.type==='comment')data.comment=review.comment;
+  else throw new Error('Unsupported contribution type');
   await setDoc(doc(db, 'reviews', review.id), data);
   return {...data, id:review.id};
 }

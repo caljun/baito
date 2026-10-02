@@ -7,7 +7,7 @@ let saved=[],reviews=[...seed],query='',activeStore=null;
 let cloud=null,cloudError=null,storesLoaded=false,reviewsLoaded=false;
 const app=document.getElementById('app'),dialog=document.getElementById('review-dialog');
 const escapeHtml=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function stats(id){const rs=reviews.filter(r=>r.storeId===id);return{reviews:rs,score:rs.length?rs.reduce((a,r)=>a+r.score,0)/rs.length:null,distribution:Array.from({length:11},(_,i)=>rs.filter(r=>r.score===i).length)}}
+function stats(id){const rs=reviews.filter(r=>r.storeId===id&&Number.isInteger(r.score));return{reviews:rs,score:rs.length?rs.reduce((a,r)=>a+r.score,0)/rs.length:null,distribution:Array.from({length:11},(_,i)=>rs.filter(r=>r.score===i).length)}}
 function scoreText(n){return n===null?"—":n.toFixed(1)}
 function colors(n){if(n===null)return "--accent:#bbb;--end:#ddd;--ink:#555;--tint:#f5f5f5";const hue=n*12;return `--accent:hsl(${hue} 63% 58%);--end:hsl(${Math.min(145,hue+20)} 64% 69%);--ink:hsl(${hue} 65% 28%);--tint:hsl(${hue} 65% 95%)`}
 function tag(n){if(n===null)return "評価なし";return n>=8?'好意的な声が多い':n>=6?'比較的好評':n>=4?'意見が分かれる':'改善を求める声'}
@@ -19,10 +19,40 @@ const sampleWorkInfo = {
  '2': { hourlyWage: 1200, workPeriod: '3か月〜半年が多い' },
  '3': { hourlyWage: 1250, workPeriod: '1年以上が多い' }
 };
+const periods = ['3か月未満', '3か月〜半年', '半年〜1年', '1年以上'];
+const contributionLabels = {rating:'総合評価を投稿する', wage:'時給を投稿する', period:'働いた期間を投稿する', comment:'声を投稿する'};
+let contributionMode = null, contributionStoreId = null, contributionBusy = false;
+function validContribution(r) {
+ if(!r || typeof r.storeId!=='string')return false;
+ if(!r.type)return Number.isInteger(r.score)&&r.score>=0&&r.score<=10&&typeof r.comment==='string';
+ if(r.type==='rating')return Number.isInteger(r.score)&&r.score>=0&&r.score<=10;
+ if(r.type==='wage')return Number.isInteger(r.hourlyWage)&&r.hourlyWage>=1&&r.hourlyWage<=100000;
+ if(r.type==='period')return periods.includes(r.workPeriod);
+ if(r.type==='comment')return typeof r.comment==='string'&&r.comment.trim().length>0&&r.comment.length<=2000;
+ return false;
+}
+function workStats(id) {
+ const wages=saved.filter(r=>r.storeId===id&&r.type==='wage').map(r=>r.hourlyWage);
+ const responses=saved.filter(r=>r.storeId===id&&r.type==='period');
+ const counts=periods.map(p=>responses.filter(r=>r.workPeriod===p).length);
+ const most=Math.max(...counts);
+ return {hourlyWage:wages.length?Math.round(wages.reduce((a,n)=>a+n,0)/wages.length):null,
+  workPeriod:most?periods.filter((_,i)=>counts[i]===most).join('・')+'が多い':null};
+}
+function buildContribution(type,storeId,form) {
+ const result={id:crypto.randomUUID(),storeId,type};
+ if(type==='rating'){const value=form.get('score');if(value===null||value==='')throw new Error('評価を選択してください。');result.score=Number(value);}
+ else if(type==='wage'){const value=form.get('hourlyWage');if(value===null||!String(value).trim())throw new Error('時給を入力してください。');result.hourlyWage=Number(value);}
+ else if(type==='period')result.workPeriod=form.get('workPeriod');
+ else if(type==='comment')result.comment=String(form.get('comment')||'').trim();
+ if(!validContribution(result))throw new Error('入力内容を確認してください。');
+ return result;
+}
 function detail(s) {
  activeStore = s;
  app.classList.add('store-detail');
- const t = stats(s.id), work = sampleWorkInfo[s.id];
+ const t = stats(s.id), work = sampleWorkInfo[s.id], contributed = workStats(s.id);
+ const wage = contributed.hourlyWage ?? work?.hourlyWage, period = contributed.workPeriod ?? work?.workPeriod;
  document.title = s.name + ' | バイトの声';
  app.innerHTML = `
   <a class="back" href="#">‹ 店舗一覧に戻る</a>
@@ -32,42 +62,57 @@ function detail(s) {
   </div>
   <div class="store-information" style="${colors(t.score)}">
    <section class="detail-section overall-rating" aria-labelledby="overall-heading">
-    <h2 id="overall-heading">総合評価</h2>
+    <div class="section-heading"><h2 id="overall-heading">総合評価</h2><button class="section-post" data-contribution="rating" aria-label="総合評価を投稿する">評価する</button></div>
     <div class="overall-value"><span class="score big-score">${scoreText(t.score)}</span><span class="denom">/ 10</span><span class="rating-count">${t.reviews.length}人</span></div>
    </section>
    <section class="detail-section" aria-labelledby="wage-heading">
-    <h2 id="wage-heading">時給</h2>
-    ${work ? `<p class="wage-value"><span>平均</span> ${work.hourlyWage.toLocaleString('ja-JP')}<span>円</span></p><small class="sample-note">サンプル値</small>` : '<p class="information-value">未登録</p>'}
+    <div class="section-heading"><h2 id="wage-heading">時給</h2><button class="section-post" data-contribution="wage" aria-label="時給を投稿する">投稿する</button></div>
+    ${wage != null ? `<p class="wage-value"><span>平均</span> ${wage.toLocaleString('ja-JP')}<span>円</span></p>${contributed.hourlyWage === null ? '<small class="sample-note">サンプル値</small>' : ''}` : '<p class="information-value">未登録</p>'}
    </section>
    <section class="detail-section" aria-labelledby="period-heading">
-    <h2 id="period-heading">働いた期間</h2>
-    <p class="information-value">${work ? escapeHtml(work.workPeriod) : '未登録'}</p>
-    ${work ? '<small class="sample-note">サンプル値</small>' : ''}
+    <div class="section-heading"><h2 id="period-heading">働いた期間</h2><button class="section-post" data-contribution="period" aria-label="働いた期間を投稿する">投稿する</button></div>
+    <p class="information-value">${period ? escapeHtml(period) : '未登録'}</p>
+    ${!contributed.workPeriod && work ? '<small class="sample-note">サンプル値</small>' : ''}
    </section>
    <section class="detail-section" aria-labelledby="voices-heading">
-    <h2 id="voices-heading">みんなの声</h2>
+    <div class="section-heading"><h2 id="voices-heading">みんなの声</h2><button class="section-post" data-contribution="comment" aria-label="みんなの声を投稿する">投稿する</button></div>
     <p class="voices-summary">${escapeHtml(s.summary)}</p>
    </section>
-  </div>
-  <div class="detail-actions"><button class="primary" id="open-review">この店舗を評価する</button></div>`;
- document.getElementById('open-review').onclick = openForm;
+  </div>`;
+ app.querySelectorAll('[data-contribution]').forEach(button=>button.onclick=()=>openForm(button.dataset.contribution));
 }
 function route(){const match=location.hash.match(/^#store\/([A-Za-z0-9_-]+)$/),s=match&&stores.find(s=>s.id===match[1]);s?detail(s):home();}
-function openForm(){document.getElementById('review-form').reset();document.getElementById('form-error').textContent='';document.querySelector('.submit').disabled=true;document.getElementById('form-store').textContent=activeStore.name;dialog.showModal();}
-document.getElementById('scores').innerHTML=Array.from({length:11},(_,i)=>`<label><input type="radio" name="score" value="${i}" required><span>${i}</span></label>`).join('');document.getElementById('scores').onchange=()=>document.querySelector('.submit').disabled=false;
-document.getElementById('review-form').onsubmit=async e=>{
- e.preventDefault();const chosen=new FormData(e.target).get('score');if(chosen===null||!activeStore)return;
+function openForm(type) {
+ if(!activeStore||contributionBusy||!contributionLabels[type])return;
+ contributionMode=type;contributionStoreId=activeStore.id;
+ const form=document.getElementById('review-form');form.reset();
+ document.getElementById('contribution-title').textContent=contributionLabels[type];
+ document.getElementById('form-error').textContent='';
+ document.getElementById('form-store').textContent=activeStore.name;
+ const fields=document.getElementById('contribution-fields');
+ if(type==='rating')fields.innerHTML=`<fieldset><legend>この職場を0〜10で評価すると？</legend><div class="scores">${Array.from({length:11},(_,i)=>`<label><input type="radio" name="score" value="${i}" required><span>${i}</span></label>`).join('')}</div><div class="scale-label"><span>よくなかった</span><span>とてもよかった</span></div></fieldset>`;
+ if(type==='wage')fields.innerHTML='<label for="hourly-wage">時給（円）</label><input class="contribution-input" id="hourly-wage" name="hourlyWage" type="number" inputmode="numeric" min="1" max="100000" step="1" placeholder="例：1280" required>';
+ if(type==='period')fields.innerHTML=`<fieldset><legend>働いた期間</legend><div class="period-options">${periods.map((p,i)=>`<label><input type="radio" name="workPeriod" value="${p}" required><span>${p}</span></label>`).join('')}</div></fieldset>`;
+ if(type==='comment')fields.innerHTML='<label for="comment">コメント</label><textarea id="comment" name="comment" rows="4" maxlength="2000" placeholder="働いてみてどうでしたか？自由に書いてください" required></textarea><p class="privacy">個人を特定できる情報は書かないでください。</p>';
+ form.querySelector('.submit').disabled=true;dialog.showModal();
+}
+const contributionForm=document.getElementById('review-form');
+contributionForm.addEventListener('input',()=>{contributionForm.querySelector('.submit').disabled=contributionBusy||!contributionForm.checkValidity();});
+contributionForm.onsubmit=async e=>{
+ e.preventDefault();if(contributionBusy||!contributionStoreId)return;
  const error=document.getElementById('form-error'),button=e.target.querySelector('.submit');error.textContent='';
  if(!cloud||!storesLoaded||!reviewsLoaded||cloudError){error.textContent='データベースに接続できていません。時間をおいて再度お試しください。';return;}
- const storeId=activeStore.id, review={id:crypto.randomUUID(),storeId,score:Number(chosen),comment:document.getElementById('comment').value.trim()};
- button.disabled=true;button.textContent='投稿中…';
+ let review;try{review=buildContribution(contributionMode,contributionStoreId,new FormData(e.target));}catch(err){error.textContent=err.message;return;}
+ contributionBusy=true;button.disabled=true;button.textContent='投稿中…';
+ const mode=contributionMode;
  try {
   await cloud.createReview(review);
   if(!saved.some(r=>r.id===review.id))saved.unshift(review);
-  reviews=[...saved,...seed];dialog.close();if(activeStore?.id===storeId){detail(activeStore);document.getElementById('open-review').focus();}
-  showToast('投稿しました。評価に反映されました。');
+  reviews=[...saved,...seed];dialog.close();
+  if(activeStore?.id===review.storeId){detail(activeStore);app.querySelector(`[data-contribution="${mode}"]`)?.focus();}
+  showToast('投稿しました。');
  } catch(err){error.textContent='投稿を保存できませんでした。時間をおいて再度お試しください。';console.error('Review write failed:',err.code);}
- finally{button.disabled=false;button.textContent='投稿する';}
+ finally{contributionBusy=false;button.disabled=false;button.textContent='投稿する';}
 };
 document.querySelectorAll('dialog').forEach(d=>{d.querySelector('.close').onclick=()=>d.close();d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();}})});document.getElementById('about').onclick=()=>document.getElementById('about-dialog').showModal();window.addEventListener('hashchange',()=>{route();window.scrollTo(0,0)});route();
 if(document.modelContext?.registerTool){try{document.modelContext.registerTool({name:'search_stores',description:'店名・会社名から店舗を検索し、一覧を表示する。',inputSchema:{type:'object',properties:{query:{type:'string'}},required:['query'],additionalProperties:false},annotations:{readOnlyHint:true},execute(input){if(!input||typeof input.query!=='string')throw new Error('query must be a string');query=input.query;if(location.hash)location.hash='';home();return stores.filter(s=>(s.name+' '+s.brand).toLowerCase().includes(query.toLowerCase())).map(s=>({id:s.id,name:s.name,score:stats(s.id).score}));}});}catch{}}
@@ -99,7 +144,7 @@ import('./firebase.js').then(api=>{
   const valid=data.filter(s=>typeof s.name==='string'&&typeof s.brand==='string').map(s=>({...s,summary:typeof s.summary==='string'?s.summary:'まだ口コミがありません。',address:typeof s.address==='string'?s.address:''}));
   stores.splice(0,stores.length,...sample,...valid.filter(s=>!sample.some(x=>x.id===s.id)));storesLoaded=true;refreshDataView();updateConnection();
  },data=>{
-  saved=data.filter(r=>typeof r.storeId==='string'&&Number.isInteger(r.score)&&r.score>=0&&r.score<=10&&typeof r.comment==='string');
+  saved=data.filter(validContribution);
   reviews=[...saved,...seed];reviewsLoaded=true;refreshDataView();updateConnection();
  },connectionFailed);window.addEventListener('pagehide',stop,{once:true});
 }).catch(connectionFailed);

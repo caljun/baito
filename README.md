@@ -25,10 +25,11 @@ python3 -m http.server 3000 --directory dist
 - 店名・会社名の検索
 - 架空の3店舗と初期口コミ
 - 店舗詳細は最大幅660pxの1カラム（総合評価・時給・働いた期間・みんなの声）
-- 時給と働いた期間は初期3店舗のみ固定サンプル値。追加店舗は未登録表示
+- 時給と働いた期間は投稿がない初期3店舗のみ固定サンプル値。追加店舗は未登録表示
 - 総合評価は口コミから算出、みんなの声は手入力のsummary
 - 評価に応じて滑らかに変化するグラデーション
-- 匿名評価投稿（評価必須、コメント任意）
+- 4項目に独立した投稿ボタン・フォーム（点数、時給、働いた期間、コメント）
+- 時給は投稿値の平均、働いた期間は最多回答を表示。実投稿があればサンプル値に優先
 - 投稿後の平均・分布・コメントの更新
 - スマホ・PCのレスポンシブ表示
 
@@ -60,3 +61,15 @@ Firebase Web設定は `dist/firebase.js` にあります。Analytics・Storage�
 - `dist/firebase.js`: Firebase初期化とFirestoreの読み書き
 - `firestore.rules`: Firestoreアクセスルール
 - `firebase.json`, `.firebaserc`: Firebase CLI設定
+
+## 独立投稿の保存形式
+
+`reviews` コレクションに `storeId`, `type`, `createdAt` と該当項目だけを保存します。
+- `rating`: `score`（0〜10の整数）
+- `wage`: `hourlyWage`（1〜100000円の整数）
+- `period`: `workPeriod`（4択）
+- `comment`: `comment`（必須・最大2000文字）
+
+総合評価と評価人数には点数投稿だけを集計します。従来の点数付き口コミも引き続き読み込みます。時給・期間・コメントには点数は必要ありません。コメントは保存されますが、AI要約は未実装のため「みんなの声」のsummaryは自動更新されません。
+
+検証: `node --test tests/contributions.test.cjs`

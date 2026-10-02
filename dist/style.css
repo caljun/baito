@@ -133,12 +133,21 @@ main.store-detail { max-width: 660px; }
 .information-value { margin: 0; font-size: 20px; line-height: 1.7; }
 .sample-note { display: block; margin-top: 8px; font-size: 12px; color: #666; }
 .voices-summary { margin: 0; font-size: 16px; line-height: 1.9; overflow-wrap: anywhere; white-space: pre-wrap; }
-.detail-actions { padding-top: 32px; }
+
 @media (max-width: 560px) {
  .store-heading { padding-bottom: 24px; }
  .store-heading h1 { font-size: 24px; }
  .detail-section { padding: 28px 0; }
  .overall-value .big-score { font-size: 46px; }
  .wage-value { font-size: 30px; }
- .detail-actions .primary { width: 100%; }
+
 }
+
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.section-heading h2 { margin: 0; }
+.section-post { flex-shrink: 0; border: 1px solid #aaa; border-radius: 4px; background: #fff; padding: 8px 14px; min-height: 44px; font-size: 14px; color: #333; }
+.section-post:hover { background: #f5f5f5; }
+.contribution-input { display: block; width: 100%; margin-top: 12px; padding: 12px; border: 1px solid #aaa; border-radius: 4px; }
+.period-options { display: grid; gap: 12px; margin-top: 16px; }
+.period-options label { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; }
+.period-options input { accent-color: #187858; width: 18px; height: 18px; }

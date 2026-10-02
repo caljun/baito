@@ -16,12 +16,39 @@ service cloud.firestore {
       allow update, delete: if false;
     }
     match /reviews/{reviewId} {
+      function legacyReview(d) {
+        return !('type' in d)
+          && d.keys().hasOnly(['storeId', 'score', 'comment', 'createdAt'])
+          && d.score is int && d.score >= 0 && d.score <= 10
+          && d.comment is string && d.comment.size() <= 2000;
+      }
+      function rating(d) {
+        return d.type == 'rating'
+          && d.keys().hasOnly(['storeId', 'type', 'score', 'createdAt'])
+          && d.score is int && d.score >= 0 && d.score <= 10;
+      }
+      function wage(d) {
+        return d.type == 'wage'
+          && d.keys().hasOnly(['storeId', 'type', 'hourlyWage', 'createdAt'])
+          && d.hourlyWage is int && d.hourlyWage >= 1 && d.hourlyWage <= 100000;
+      }
+      function period(d) {
+        return d.type == 'period'
+          && d.keys().hasOnly(['storeId', 'type', 'workPeriod', 'createdAt'])
+          && d.workPeriod in ['3か月未満', '3か月〜半年', '半年〜1年', '1年以上'];
+      }
+      function comment(d) {
+        return d.type == 'comment'
+          && d.keys().hasOnly(['storeId', 'type', 'comment', 'createdAt'])
+          && d.comment is string && d.comment.matches('[\\s\\S]*[^\\s][\\s\\S]*') && d.comment.size() <= 2000;
+      }
       allow read: if true;
-      allow create: if request.resource.data.keys().hasOnly(['storeId', 'score', 'comment', 'createdAt'])
-        && request.resource.data.storeId is string && validStoreId(request.resource.data.storeId)
-        && request.resource.data.score is int && request.resource.data.score >= 0 && request.resource.data.score <= 10
-        && request.resource.data.comment is string && request.resource.data.comment.size() <= 2000
-        && request.resource.data.createdAt == request.time;
+      allow create: if request.resource.data.storeId is string
+        && validStoreId(request.resource.data.storeId)
+        && request.resource.data.createdAt == request.time
+        && (legacyReview(request.resource.data)
+          || ('type' in request.resource.data && (rating(request.resource.data)
+            || wage(request.resource.data) || period(request.resource.data) || comment(request.resource.data))));
       allow update, delete: if false;
     }
   }
