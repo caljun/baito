@@ -155,3 +155,5 @@ select.contribution-input { background: #fff; color: #222; font-size: 16px; min-
 .year-comments p { font-size: 14px; line-height: 1.7; margin: 0; padding: 8px 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .year-comments p + p { border-top: 1px solid #eee; }
 @media (max-width: 560px) { .year-card { flex-basis: 132px; padding: 12px; } }
+
+.year-empty-state { margin: 18px 0 0; font-size: 13px; color: #777; }

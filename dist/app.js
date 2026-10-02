@@ -84,7 +84,9 @@ function yearGroups(id,type) {
  return groups;
 }
 function yearCards(id,type) {
- const cards=yearGroups(id,type).map(({label,rows})=>{
+ const populated=yearGroups(id,type).filter(group=>group.rows.length>0);
+ if(!populated.length)return '<p class="year-empty-state">年別データはまだありません</p>';
+ const cards=populated.map(({label,rows})=>{
   let content='<p class="year-empty">データなし</p>',style='';
   if(rows.length){
    if(type==='rating'){const value=rows.reduce((sum,r)=>sum+r.score,0)/rows.length;style=colors(value);content=`<p class="year-value year-score">${value.toFixed(1)}<small> / 10</small></p><small class="year-count">${rows.length}件</small>`;}

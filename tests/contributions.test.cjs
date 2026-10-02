@@ -59,7 +59,9 @@ test('Year cards separate current, dated and unknown data without inventing miss
  assert.equal(run(`yearGroups('1','rating').find(g=>g.label==='${year-1}年').rows.length`),0);
  assert.equal(run("yearGroups('1','rating').find(g=>g.label==='時期不明').rows.length"),10);
  assert.ok(run("yearCards('1','rating')").includes('5.0'));assert.ok(run("yearCards('1','wage')").includes('1,300'));
- assert.ok(run("yearCards('1','period')").includes('データなし'));assert.ok(!run("yearCards('1','period')").includes('サンプル'));
+ assert.ok(run("yearCards('1','period')").includes('年別データはまだありません'));assert.ok(!run("yearCards('1','period')").includes('サンプル'));
  assert.ok(run("yearCards('1','comment')").includes('&lt;script&gt;'));assert.ok(!run("yearCards('1','comment')").includes('<script>'));
- run('detail(stores[0])');assert.equal((run('app.innerHTML').match(/class="year-cards"/g)||[]).length,4);
+ run('detail(stores[0])');assert.equal((run('app.innerHTML').match(/class="year-cards"/g)||[]).length,3);
+ assert.ok(!run("yearCards('1','rating')").includes(`${year-1}年`));
+ assert.ok(!run("yearCards('1','rating')").includes('データなし'));
 });
