@@ -10,8 +10,24 @@ const escapeHtml=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>'
 function stats(id){const rs=reviews.filter(r=>r.storeId===id&&Number.isInteger(r.score));return{reviews:rs,score:rs.length?rs.reduce((a,r)=>a+r.score,0)/rs.length:null,distribution:Array.from({length:11},(_,i)=>rs.filter(r=>r.score===i).length)}}
 function scoreText(n){return n===null?"—":n.toFixed(1)}
 function colors(n){if(n===null)return "--accent:#bbb;--end:#ddd;--ink:#555;--tint:#f5f5f5";const hue=n*12;return `--accent:hsl(${hue} 63% 58%);--end:hsl(${Math.min(145,hue+20)} 64% 69%);--ink:hsl(${hue} 65% 28%);--tint:hsl(${hue} 65% 95%)`}
-function tag(n){if(n===null)return "評価なし";return n>=8?'好意的な声が多い':n>=6?'比較的好評':n>=4?'意見が分かれる':'改善を求める声'}
-function card(s){const t=stats(s.id);return `<a class="card" href="#store/${s.id}" style="${colors(t.score)}" aria-label="${escapeHtml(s.name)}、評価${scoreText(t.score)}"><div class="ribbon"></div><div class="card-inner"><span class="brand">${escapeHtml(s.brand)}</span><h3>${escapeHtml(s.name)}</h3><div class="card-score"><div><span class="score">${scoreText(t.score)}</span><span class="denom">/ 10</span></div><div><div class="mini-bars" aria-hidden="true">${t.distribution.map(n=>`<i style="height:${Math.max(3,n/Math.max(...t.distribution,1)*27)}px"></i>`).join('')}</div><span class="count">口コミ ${t.reviews.length}件</span></div></div><p class="summary-short">${escapeHtml(s.summary)}</p><div class="card-bottom"><span class="pill">${tag(t.score)}</span><b>口コミを見る</b></div></div></a>`}
+function card(s) {
+ const t=stats(s.id), contributed=workStats(s.id), sample=sampleWorkInfo[s.id];
+ const wage=contributed.hourlyWage??sample?.hourlyWage, period=contributed.workPeriod??sample?.workPeriod;
+ const sampleFields=[];
+ if(sample&&contributed.hourlyWage===null)sampleFields.push('時給');
+ if(sample&&!contributed.workPeriod)sampleFields.push('期間');
+ return `<a class="card" href="#store/${s.id}" style="${colors(t.score)}" aria-label="${escapeHtml(s.name)}、評価${scoreText(t.score)}">
+  <div class="ribbon"></div><div class="card-inner">
+   <h3>${escapeHtml(s.name)}</h3><span class="brand">${escapeHtml(s.brand)}</span>
+   <dl class="card-facts">
+    <div class="card-rating"><dt>総合評価</dt><dd><span class="score">${scoreText(t.score)}</span><span class="denom">/ 10</span><span class="count">${t.reviews.length}人</span></dd></div>
+    <div><dt>時給</dt><dd>${wage!=null?`平均 ${wage.toLocaleString('ja-JP')}円`:'未登録'}</dd></div>
+    <div><dt>働いた期間</dt><dd>${period?escapeHtml(period):'未登録'}</dd></div>
+   </dl>
+   <div class="card-voices"><span class="card-label">みんなの声</span><p class="summary-short">${escapeHtml(s.summary)}</p></div>
+   ${sampleFields.length?`<small class="card-sample-note">${sampleFields.join('・')}はサンプル値</small>`:''}
+  </div></a>`;
+}
 function renderCards(){const result=stores.filter(s=>(s.name+' '+s.brand).normalize('NFKC').toLowerCase().includes(query.normalize('NFKC').trim().toLowerCase()));document.getElementById('result-count').textContent=`${result.length}店舗`;document.getElementById('cards').innerHTML=result.length?result.map(card).join(''):'<div class="empty">該当する店舗がありません。<br>別の店名・会社名で検索してください。</div>';}
 function home(){app.classList.remove('store-detail');activeStore=null;document.title='バイトの声 | 店舗ごとのアルバイト口コミ';app.innerHTML=`<div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="search" type="search" placeholder="店名・会社名で検索" aria-label="店名・会社名で検索" value="${escapeHtml(query)}"></div><span class="demo">初期の3店舗は架空のサンプルです</span><div class="list-head"><h2>店舗を探す</h2><span id="result-count" aria-live="polite"></span></div><div class="grid" id="cards"></div>`;renderCards();document.getElementById('search').addEventListener('input',e=>{query=e.target.value;renderCards()});}
 const sampleWorkInfo = {
