@@ -13,8 +13,45 @@ function colors(n){if(n===null)return "--accent:#bbb;--end:#ddd;--ink:#555;--tin
 function tag(n){if(n===null)return "評価なし";return n>=8?'好意的な声が多い':n>=6?'比較的好評':n>=4?'意見が分かれる':'改善を求める声'}
 function card(s){const t=stats(s.id);return `<a class="card" href="#store/${s.id}" style="${colors(t.score)}" aria-label="${escapeHtml(s.name)}、評価${scoreText(t.score)}"><div class="ribbon"></div><div class="card-inner"><span class="brand">${escapeHtml(s.brand)}</span><h3>${escapeHtml(s.name)}</h3><div class="card-score"><div><span class="score">${scoreText(t.score)}</span><span class="denom">/ 10</span></div><div><div class="mini-bars" aria-hidden="true">${t.distribution.map(n=>`<i style="height:${Math.max(3,n/Math.max(...t.distribution,1)*27)}px"></i>`).join('')}</div><span class="count">口コミ ${t.reviews.length}件</span></div></div><p class="summary-short">${escapeHtml(s.summary)}</p><div class="card-bottom"><span class="pill">${tag(t.score)}</span><b>口コミを見る</b></div></div></a>`}
 function renderCards(){const result=stores.filter(s=>(s.name+' '+s.brand).normalize('NFKC').toLowerCase().includes(query.normalize('NFKC').trim().toLowerCase()));document.getElementById('result-count').textContent=`${result.length}店舗`;document.getElementById('cards').innerHTML=result.length?result.map(card).join(''):'<div class="empty">該当する店舗がありません。<br>別の店名・会社名で検索してください。</div>';}
-function home(){activeStore=null;document.title='バイトの声 | 店舗ごとのアルバイト口コミ';app.innerHTML=`<div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="search" type="search" placeholder="店名・会社名で検索" aria-label="店名・会社名で検索" value="${escapeHtml(query)}"></div><span class="demo">初期の3店舗は架空のサンプルです</span><div class="list-head"><h2>店舗を探す</h2><span id="result-count" aria-live="polite"></span></div><div class="grid" id="cards"></div>`;renderCards();document.getElementById('search').addEventListener('input',e=>{query=e.target.value;renderCards()});}
-function detail(s){activeStore=s;const t=stats(s.id),max=Math.max(...t.distribution,1);document.title=s.name+' | バイトの声';app.innerHTML=`<a class="back" href="#">‹ 店舗一覧に戻る</a><section class="detail-hero" style="${colors(t.score)}"><div class="hero-content"><div><span class="brand">${escapeHtml(s.brand)}</span><h1>${escapeHtml(s.name)}</h1><span class="address">${escapeHtml(s.address)}${examples.some((_,i)=>String(i+1)===s.id)?" · サンプル店舗":""}</span></div><div><span class="score big-score">${scoreText(t.score)}</span><span class="denom">/ 10</span><div class="count">${t.reviews.length}件の評価</div></div></div></section><div class="detail-grid" style="${colors(t.score)}"><section class="panel"><h2>評価の分布</h2><div class="histogram" role="img" aria-label="${t.distribution.map((n,i)=>`${i}点: ${n}件`).join('、')}">${t.distribution.map((n,i)=>`<div class="bin"><b>${n}</b><div class="bar" style="--height:${n/max*115}px"></div><span>${i}</span></div>`).join('')}</div></section><section class="panel trend"><h2>この店舗の傾向</h2><p>${escapeHtml(s.summary)}</p><button class="primary" id="open-review">この店舗を評価する</button></section></div><div class="reviews-head"><h2>働いた人の声</h2><span>${t.reviews.filter(r=>r.comment.trim()).length}件のコメント</span></div><section>${t.reviews.filter(r=>r.comment.trim()).map(r=>`<article class="review" style="${colors(r.score)}"><div class="review-rating">${r.score}<small> / 10</small></div><p>${escapeHtml(r.comment)}</p></article>`).join('')||'<p class="muted">まだコメントはありません。</p>'}</section>`;document.getElementById('open-review').onclick=openForm;}
+function home(){app.classList.remove('store-detail');activeStore=null;document.title='バイトの声 | 店舗ごとのアルバイト口コミ';app.innerHTML=`<div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="search" type="search" placeholder="店名・会社名で検索" aria-label="店名・会社名で検索" value="${escapeHtml(query)}"></div><span class="demo">初期の3店舗は架空のサンプルです</span><div class="list-head"><h2>店舗を探す</h2><span id="result-count" aria-live="polite"></span></div><div class="grid" id="cards"></div>`;renderCards();document.getElementById('search').addEventListener('input',e=>{query=e.target.value;renderCards()});}
+const sampleWorkInfo = {
+ '1': { hourlyWage: 1280, workPeriod: '半年〜1年が多い' },
+ '2': { hourlyWage: 1200, workPeriod: '3か月〜半年が多い' },
+ '3': { hourlyWage: 1250, workPeriod: '1年以上が多い' }
+};
+function detail(s) {
+ activeStore = s;
+ app.classList.add('store-detail');
+ const t = stats(s.id), work = sampleWorkInfo[s.id];
+ document.title = s.name + ' | バイトの声';
+ app.innerHTML = `
+  <a class="back" href="#">‹ 店舗一覧に戻る</a>
+  <div class="store-heading">
+   <h1>${escapeHtml(s.name)}</h1>
+   <span class="brand">${escapeHtml(s.brand)}</span>
+  </div>
+  <div class="store-information" style="${colors(t.score)}">
+   <section class="detail-section overall-rating" aria-labelledby="overall-heading">
+    <h2 id="overall-heading">総合評価</h2>
+    <div class="overall-value"><span class="score big-score">${scoreText(t.score)}</span><span class="denom">/ 10</span><span class="rating-count">${t.reviews.length}人</span></div>
+   </section>
+   <section class="detail-section" aria-labelledby="wage-heading">
+    <h2 id="wage-heading">時給</h2>
+    ${work ? `<p class="wage-value"><span>平均</span> ${work.hourlyWage.toLocaleString('ja-JP')}<span>円</span></p><small class="sample-note">サンプル値</small>` : '<p class="information-value">未登録</p>'}
+   </section>
+   <section class="detail-section" aria-labelledby="period-heading">
+    <h2 id="period-heading">働いた期間</h2>
+    <p class="information-value">${work ? escapeHtml(work.workPeriod) : '未登録'}</p>
+    ${work ? '<small class="sample-note">サンプル値</small>' : ''}
+   </section>
+   <section class="detail-section" aria-labelledby="voices-heading">
+    <h2 id="voices-heading">みんなの声</h2>
+    <p class="voices-summary">${escapeHtml(s.summary)}</p>
+   </section>
+  </div>
+  <div class="detail-actions"><button class="primary" id="open-review">この店舗を評価する</button></div>`;
+ document.getElementById('open-review').onclick = openForm;
+}
 function route(){const match=location.hash.match(/^#store\/([A-Za-z0-9_-]+)$/),s=match&&stores.find(s=>s.id===match[1]);s?detail(s):home();}
 function openForm(){document.getElementById('review-form').reset();document.getElementById('form-error').textContent='';document.querySelector('.submit').disabled=true;document.getElementById('form-store').textContent=activeStore.name;dialog.showModal();}
 document.getElementById('scores').innerHTML=Array.from({length:11},(_,i)=>`<label><input type="radio" name="score" value="${i}" required><span>${i}</span></label>`).join('');document.getElementById('scores').onchange=()=>document.querySelector('.submit').disabled=false;
